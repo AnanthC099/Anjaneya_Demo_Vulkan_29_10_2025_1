@@ -95,6 +95,10 @@ static int         sPansDone       = 0;
 static float       sPendingBlendFade  = 0.0f;
 static float       sRecordedBlendFade = 0.0f;
 
+// === Showcase timeline ===
+// Scene0 (Intro) : pause 2s, fade in over 3s, hold for 7s, transition overlay across 8s
+// Scene1 (Main)  : run animation and linger 7s after it completes
+// Scene2 (Final) : hold combined main scene + credits for 15s before ending on black
 static const DWORD K_SCENE0_FADE_IN_DELAY_MS        = 2000u;
 static const DWORD K_SCENE0_FADE_IN_MS              = 3000u;
 static const DWORD K_SCENE0_HOLD_MS                 = 7000u;
