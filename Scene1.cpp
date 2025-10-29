@@ -95,17 +95,16 @@ static int         sPansDone       = 0;
 static float       sPendingBlendFade  = 0.0f;
 static float       sRecordedBlendFade = 0.0f;
 
-// === Showcase timeline ===
-// Scene0 (Intro) : pause 2s, fade in over 3s, hold for 7s, transition overlay across 8s
-// Scene1 (Main)  : run animation, linger 7s after it completes, fade to black over 3s
-// Scene2 (Final) : hold combined main scene + credits for 15s before ending on black
 static const DWORD K_SCENE0_FADE_IN_DELAY_MS        = 2000u;
 static const DWORD K_SCENE0_FADE_IN_MS              = 3000u;
 static const DWORD K_SCENE0_HOLD_MS                 = 7000u;
 static const DWORD K_SCENE0_OVERLAY_TRANSITION_MS   = 8000u;
 static const DWORD K_SCENE1_FADE_TO_BLACK_MS        = 3000u;
 static const DWORD K_SCENE1_POST_ANIM_EXTRA_MS      = 7000u;
-static const DWORD K_SCENE2_HOLD_MS                 = 15000u;
+static const DWORD K_SCENE2_HOLD_MS                 = 12000u;
+static const DWORD K_SCENE2_FOCUS_PULL_MS           = 4500u;
+static const DWORD K_SCENE3_HOLD_MS                 = 14000u;
+static const DWORD K_SCENE3_FADE_TO_BLACK_MS        = 3500u;
 
 typedef enum SequenceStateTag
 {
@@ -117,6 +116,9 @@ typedef enum SequenceStateTag
     SEQUENCE_SCENE1_HOLD,
     SEQUENCE_SCENE1_FADE_TO_BLACK,
     SEQUENCE_SCENE2_HOLD,
+    SEQUENCE_SCENE2_FOCUS_PULL,
+    SEQUENCE_SCENE3_HOLD,
+    SEQUENCE_SCENE3_FADE_TO_BLACK,
     SEQUENCE_COMPLETE
 } SequenceState;
 
@@ -323,6 +325,8 @@ static void EnterSequenceState(SequenceState state)
         gActiveScene = ACTIVE_SCENE_SCENE0;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 0.0f; // remain black before reveal
         UpdateBlendFadeInternal(gCtx_Switcher.gFade);
         break;
@@ -330,6 +334,8 @@ static void EnterSequenceState(SequenceState state)
         gActiveScene = ACTIVE_SCENE_SCENE0;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         BeginScene0Audio();
         gCtx_Switcher.gFade = 0.0f; // fade will animate towards full visibility
         UpdateBlendFadeInternal(gCtx_Switcher.gFade);
@@ -338,6 +344,8 @@ static void EnterSequenceState(SequenceState state)
         gActiveScene = ACTIVE_SCENE_SCENE0;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 1.0f; // fully visible
         UpdateBlendFadeInternal(gCtx_Switcher.gFade);
         break;
@@ -345,6 +353,8 @@ static void EnterSequenceState(SequenceState state)
         gActiveScene = ACTIVE_SCENE_SCENE1;
         gCtx_Switcher.gScene01DoubleExposureActive = TRUE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 0.0f;
         ResetScene1ForSequence();
         sScene1StartedViaOverlay = TRUE;
@@ -356,6 +366,8 @@ static void EnterSequenceState(SequenceState state)
         gActiveScene = ACTIVE_SCENE_SCENE1;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 1.0f; // fully reveal Scene1 after overlay
         if (!sScene1StartedViaOverlay)
         {
@@ -373,18 +385,48 @@ static void EnterSequenceState(SequenceState state)
         gActiveScene = ACTIVE_SCENE_SCENE1;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = TRUE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         break;
     case SEQUENCE_SCENE2_HOLD:
         gActiveScene = ACTIVE_SCENE_SCENE2;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 1.0f;
         UpdateBlendFadeInternal(gCtx_Switcher.gFade);
+        break;
+    case SEQUENCE_SCENE2_FOCUS_PULL:
+        gActiveScene = ACTIVE_SCENE_SCENE3;
+        gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
+        gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = TRUE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
+        gCtx_Switcher.gFade = 1.0f;
+        UpdateBlendFadeInternal(gCtx_Switcher.gFade);
+        break;
+    case SEQUENCE_SCENE3_HOLD:
+        gActiveScene = ACTIVE_SCENE_SCENE3;
+        gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
+        gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 1.0f;
+        gCtx_Switcher.gFade = 1.0f;
+        UpdateBlendFadeInternal(gCtx_Switcher.gFade);
+        break;
+    case SEQUENCE_SCENE3_FADE_TO_BLACK:
+        gActiveScene = ACTIVE_SCENE_SCENE3;
+        gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
+        gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
         break;
     case SEQUENCE_COMPLETE:
         // End on black
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 0.0f;
         UpdateBlendFadeInternal(gCtx_Switcher.gFade);
         break;
@@ -403,6 +445,8 @@ static void StopShowcaseSequenceInternal(void)
     sScene1StartedViaOverlay = FALSE;
     gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
     gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+    gCtx_Switcher.gScene23FocusPullActive = FALSE;
+    gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
     // Leave gFade as-is to remain on black if the sequence finished there.
     UpdateBlendFadeInternal(gCtx_Switcher.gFade);
 }
@@ -495,8 +539,59 @@ static void UpdateShowcaseSequenceInternal(void)
         elapsed = now - sSequenceStateStartMs;
         if (elapsed >= K_SCENE2_HOLD_MS)
         {
-            EnterSequenceState(SEQUENCE_COMPLETE);
+            EnterSequenceState(SEQUENCE_SCENE2_FOCUS_PULL);
         }
+        break;
+
+    case SEQUENCE_SCENE2_FOCUS_PULL:
+    {
+        gCtx_Switcher.gFade = 1.0f;
+        UpdateBlendFadeInternal(gCtx_Switcher.gFade);
+        DWORD elapsedFocus = now - sSequenceStateStartMs;
+        float duration = (float)K_SCENE2_FOCUS_PULL_MS;
+        if (duration < 1.0f)
+        {
+            duration = 1.0f;
+        }
+        float u = Clamp01(elapsedFocus / duration);
+        float focus = ease01(u);
+        if (fabsf(focus - gCtx_Switcher.gScene23FocusPullFactor) > 5e-4f)
+        {
+            gCtx_Switcher.gScene23FocusPullFactor = focus;
+            sCmdBuffersDirty = TRUE;
+        }
+        if (u >= 1.0f)
+        {
+            EnterSequenceState(SEQUENCE_SCENE3_HOLD);
+        }
+    }
+        break;
+
+    case SEQUENCE_SCENE3_HOLD:
+        gCtx_Switcher.gFade = 1.0f;
+        UpdateBlendFadeInternal(gCtx_Switcher.gFade);
+        if (fabsf(1.0f - gCtx_Switcher.gScene23FocusPullFactor) > 5e-4f)
+        {
+            gCtx_Switcher.gScene23FocusPullFactor = 1.0f;
+            sCmdBuffersDirty = TRUE;
+        }
+        elapsed = now - sSequenceStateStartMs;
+        if (elapsed >= K_SCENE3_HOLD_MS)
+        {
+            EnterSequenceState(SEQUENCE_SCENE3_FADE_TO_BLACK);
+        }
+        break;
+
+    case SEQUENCE_SCENE3_FADE_TO_BLACK:
+        fadeProgress = Clamp01((now - sSequenceStateStartMs) / (float)K_SCENE3_FADE_TO_BLACK_MS);
+        gCtx_Switcher.gFade = 1.0f - fadeProgress;
+        UpdateBlendFadeInternal(gCtx_Switcher.gFade);
+        if (fabsf(gCtx_Switcher.gScene23FocusPullFactor) > 5e-4f)
+        {
+            gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
+            sCmdBuffersDirty = TRUE;
+        }
+        if (fadeProgress >= 1.0f) EnterSequenceState(SEQUENCE_COMPLETE);
         break;
 
     case SEQUENCE_COMPLETE:
