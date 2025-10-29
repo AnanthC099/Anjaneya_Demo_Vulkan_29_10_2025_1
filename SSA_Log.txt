@@ -515,17 +515,8 @@ createCommandBuffers() --> scene2 vkAllocateCommandBuffers() succeeded for itera
 createCommandBuffers() --> scene2 vkAllocateCommandBuffers() succeeded for iteration 1
 createCommandBuffers() --> scene3 vkAllocateCommandBuffers() succeeded for iteration 0
 createCommandBuffers() --> scene3 vkAllocateCommandBuffers() succeeded for iteration 1
-ApplyScenePhase() --> Showing Scene3
-WndProc() --> Requested Scene3
-ApplyScenePhase() --> Showing Scene2
-WndProc() --> Requested Scene2
-ApplyScenePhase() --> Showing Scene3
-WndProc() --> Requested Scene3
+WndProc() --> Showcase sequence started
 BeginScene0Audio() --> Playing Omega.wav
-ApplyScenePhase() --> Showing Scene0
-WndProc() --> Requested Scene0
-ApplyScenePhase() --> Showing Scene1
-WndProc() --> Requested Scene1
 Resize() --> vkDeviceWaitIdle() is done
 Resize() --> gCtx_Switcher.vkFrameBuffer_array() is done
 Resize() --> vkFreeCommandBuffers() is done
