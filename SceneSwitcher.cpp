@@ -304,7 +304,7 @@ static VkResult CreateCompositeUniformBuffer(void)
     return VK_SUCCESS;
 }
 
-static VkResult UpdateCompositeUniformBuffer(float transition)
+static VkResult UpdateCompositeUniformBuffer(float transition, float focusPull)
 {
     if (gCompositeUniformData.vkDeviceMemory == VK_NULL_HANDLE)
     {
@@ -320,12 +320,21 @@ static VkResult UpdateCompositeUniformBuffer(float transition)
         transition = 1.0f;
     }
 
+    if (focusPull < 0.0f)
+    {
+        focusPull = 0.0f;
+    }
+    else if (focusPull > 1.0f)
+    {
+        focusPull = 1.0f;
+    }
+
     GlobalContext_MyUniformData data;
     memset(&data, 0, sizeof(data));
     data.modelMatrix = glm::mat4(1.0f);
     data.viewMatrix = glm::mat4(1.0f);
     data.projectionMatrix = glm::mat4(1.0f);
-    data.fade = glm::vec4(transition, 1.0f - transition, 0.0f, 0.0f);
+    data.fade = glm::vec4(transition, 1.0f - transition, focusPull, 0.0f);
 
     void* mapped = NULL;
     VkResult vkResult = vkMapMemory(gCtx_Switcher.vkDevice,
@@ -769,7 +778,7 @@ static VkResult InitializeOffscreenResources(void)
 
     UpdateCompositeDescriptorSets();
 
-    vkResult = UpdateCompositeUniformBuffer(0.0f);
+    vkResult = UpdateCompositeUniformBuffer(0.0f, 0.0f);
     if (vkResult != VK_SUCCESS)
     {
         return vkResult;
@@ -813,6 +822,8 @@ void InitializeSceneSwitcherGlobals(void)
     gCtx_Switcher.gFade = 0.0f;
     gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
     gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+    gCtx_Switcher.gScene23FocusPullActive = FALSE;
+    gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
     gScene0AudioIsPlaying = FALSE;
 
     memset(&gCompositeUniformData, 0, sizeof(gCompositeUniformData));
@@ -838,6 +849,8 @@ static void ApplyScenePhase(SequencePhase phase)
         gActiveScene = ACTIVE_SCENE_SCENE0;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         /*
          * Scene 0 renders directly to the offscreen target that is used as the
          * base layer during compositing.  The fragment shader multiplies the
@@ -854,6 +867,8 @@ static void ApplyScenePhase(SequencePhase phase)
         gActiveScene = ACTIVE_SCENE_SCENE1;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 1.0f;
         fprintf(gCtx_Switcher.gpFile, "ApplyScenePhase() --> Showing Scene1\n");
         break;
@@ -861,6 +876,8 @@ static void ApplyScenePhase(SequencePhase phase)
         gActiveScene = ACTIVE_SCENE_SCENE2;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 1.0f;
         fprintf(gCtx_Switcher.gpFile, "ApplyScenePhase() --> Showing Scene2\n");
         break;
@@ -868,6 +885,8 @@ static void ApplyScenePhase(SequencePhase phase)
         gActiveScene = ACTIVE_SCENE_SCENE3;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 1.0f;
         gCtx_Switcher.gFade = 1.0f;
         fprintf(gCtx_Switcher.gpFile, "ApplyScenePhase() --> Showing Scene3\n");
         break;
@@ -875,6 +894,8 @@ static void ApplyScenePhase(SequencePhase phase)
         gActiveScene = ACTIVE_SCENE_NONE;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullActive = FALSE;
+        gCtx_Switcher.gScene23FocusPullFactor = 0.0f;
         gCtx_Switcher.gFade = 0.0f;
         fprintf(gCtx_Switcher.gpFile, "ApplyScenePhase() --> Sequence idle\n");
         break;
@@ -7150,7 +7171,8 @@ VkResult buildCommandBuffers(void)
         }
     }
 
-    VkResult compositeUniform = UpdateCompositeUniformBuffer(transition);
+    float focusPull = gCtx_Switcher.gScene23FocusPullFactor;
+    VkResult compositeUniform = UpdateCompositeUniformBuffer(transition, focusPull);
     if (compositeUniform != VK_SUCCESS)
     {
         return compositeUniform;
@@ -7396,9 +7418,24 @@ VkResult buildCommandBuffers(void)
             overlayWeight = transition;
             break;
         case ACTIVE_SCENE_SCENE3:
-            baseScene = UINT32_MAX;
-            overlayScene = 3;
-            overlayWeight = transition;
+            if (gCtx_Switcher.gScene23FocusPullActive)
+            {
+                baseScene = 2;
+                overlayScene = 3;
+                float focus = gCtx_Switcher.gScene23FocusPullFactor;
+                if (focus < 0.0f) focus = 0.0f;
+                if (focus > 1.0f) focus = 1.0f;
+                float overlayEase = powf(focus, 0.75f);
+                float baseEase = powf(1.0f - focus, 1.25f);
+                overlayWeight = overlayEase;
+                baseWeight = baseEase;
+            }
+            else
+            {
+                baseScene = UINT32_MAX;
+                overlayScene = 3;
+                overlayWeight = transition;
+            }
             break;
         case ACTIVE_SCENE_SCENE0:
             baseScene = 0;

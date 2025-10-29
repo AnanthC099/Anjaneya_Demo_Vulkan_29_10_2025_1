@@ -58,7 +58,8 @@ typedef struct GlobalContext_MyUniformData
     glm::mat4 projectionMatrix;
     /* Scene 0: fade.x.
        Scene 1: fade = (fadeAmt, screenWidth, screenHeight, overlaySizeFrac).
-       Scene 2: reserved (set to zero). */
+       Scene 2: reserved (set to zero).
+       Composite: fade.z carries focus-pull strength (0..1). */
     glm::vec4 fade;
 } GlobalContext_MyUniformData;
 
@@ -270,6 +271,8 @@ typedef struct GlobalContext_Switcher
     float gFade;
     BOOL  gScene01DoubleExposureActive;
     BOOL  gScene12CrossfadeActive;
+    BOOL  gScene23FocusPullActive;
+    float gScene23FocusPullFactor;
 
     // Scene sequence state
     SequencePhase gSequencePhase;
