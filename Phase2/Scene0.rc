@@ -1,4 +1,0 @@
-#include<windows.h>
-#include "SceneSwitcher.h"
-MYICON ICON SSA.ico
-
