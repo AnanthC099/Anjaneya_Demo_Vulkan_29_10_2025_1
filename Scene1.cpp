@@ -427,6 +427,7 @@ static void EnterSequenceState(SequenceState state)
         break;
     case SEQUENCE_COMPLETE:
         // End on black
+        gActiveScene = ACTIVE_SCENE_NONE;
         gCtx_Switcher.gScene01DoubleExposureActive = FALSE;
         gCtx_Switcher.gScene12CrossfadeActive = FALSE;
         gCtx_Switcher.gScene23FocusPullActive = FALSE;
